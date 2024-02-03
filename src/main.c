@@ -2,67 +2,16 @@
 #include <kernel.h>
 #include <device.h>
 #include <devicetree.h>
-#include <drivers/gpio.h>
-#include <drivers/i2c.h>
-#include <drivers/spi.h>
 #include <logging/log.h>
 
-// @todo: move from main.c
-bool activate_device(const struct gpio_dt_spec * device_spec) {
-    int ret;
-
-    if ( ! device_is_ready(device_spec->port)) {
-        return false;
-    }
-
-    ret = gpio_pin_configure_dt(device_spec, GPIO_OUTPUT_ACTIVE);
-    if (ret < 0) {
-        return false;
-    }
-
-    return true;
-}
-
-bool activate_i2c_device(const struct device *i2c_dev, uint32_t i2c_cfg) {
-    if (i2c_dev == NULL || ! device_is_ready(i2c_dev))
-    {
-        printk("could not get I2C device\n");
-        return false;
-    } else {
-        if (i2c_configure(i2c_dev, i2c_cfg)) {
-            printk("I2C config failed\n");
-            return false;
-        } else {
-            printk("I2C device ready\n");
-        }
-    }
-
-    return true;
-}
-
-bool activate_spi_device(const struct device *spi_dev) {
-    if (spi_dev == NULL || ! device_is_ready(spi_dev))
-    {
-        printk("could not get SPI device");
-        return false;
-    } else {
-        printk("SPI device ready");
-    }
-
-//    LOG_DBG("spi_cs.bus = %p", spi_dev.bus);
-//    LOG_DBG("spi_cs.config.cs->gpio.port = %p", spi_cs.config.cs->gpio.port);
-//    LOG_DBG("spi_cs.config.cs->gpio.pin = %u", spi_cs.config.cs->gpio.pin);
-    return true;
-}
-
-void display_led_status(const bool * ok, uint8_t index) {
-    printf("led%u: %s\n", index, ok ? "ok" : "fail");
-}
+#include "leds.h"
+#include "sensor.h"
+#include "display.h"
 
 LOG_MODULE_REGISTER(logger, CONFIG_LOG_DEFAULT_LEVEL);
 
 /* 1000 msec = 1 sec */
-#define SLEEP_TIME_MS 34
+#define SLEEP_TIME_MS (1000)
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
@@ -70,7 +19,7 @@ LOG_MODULE_REGISTER(logger, CONFIG_LOG_DEFAULT_LEVEL);
 #define LED2_NODE DT_ALIAS(led2)
 
 #define I2C_NODE DT_NODELABEL(i2c0)
-#define SPI_NODE DT_NODELABEL(spi0)
+#define SPI_NODE DT_NODELABEL(spi1)
 
 /*
  * A build error on this line means your board is unsupported.
@@ -84,81 +33,110 @@ static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
 static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
 
-K_HEAP_DEFINE(heap1, 1024);
-
-uint32_t i2c_cfg = I2C_SPEED_SET(I2C_SPEED_STANDARD) | I2C_MODE_MASTER;
+#define ERROR_BUFFER_SIZE 6
+#define DATA_BUFFER_SIZE 8
 
 int main(void)
 {
     /**
-     * I2C
+     * I2C config
      */
      const struct device *i2c_dev = DEVICE_DT_GET(I2C_NODE);
-//     const struct i2c_dt_spec i2c_spec = I2C_DT_SPEC_GET(I2C_NODE1);
+     const uint32_t i2c_cfg = sensor_get_config();
 
     /**
-     * SPI
+     * SPI config
      */
-//    const struct device *spi_dev = DEVICE_DT_GET(SPI_NODE);
+    const struct device *spi_dev = DEVICE_DT_GET(SPI_NODE);
 
-    int ret;
+    int opcode;
 
-    printf("\n");
+    printk("[sys] initialing ...\n");
 
     // green
-    bool led0_ok = activate_device(&led0);
-    display_led_status(&led0_ok, 0);
+    bool led0_ok = activate_led_device(&led0, 0);
 
     // blue
-    bool led1_ok = activate_device(&led1);
-    display_led_status(&led1_ok, 1);
+    bool led1_ok = activate_led_device(&led1, 0);
 
     // red
-    bool led2_ok = activate_device(&led2);
-    display_led_status(&led2_ok, 2);
+    bool led2_ok = activate_led_device(&led2, 0);
 
     // i2c
-    activate_i2c_device(i2c_dev, i2c_cfg);
+    bool i2c_ok = activate_mpl3115a2_device(i2c_dev, i2c_cfg)
+            && setup_mpl3115a2_device(i2c_dev);
 
     // spi
-//    activate_spi_device(spi_dev);
+    bool spi_ok = activate_display_device(spi_dev);
 
-    // try to allocate heap
-//    k_timeout_t timeout = {100};
-//    k_heap_init(&heap1, NULL, 1024);
+    // sensor buffers
+    int32_t sensor_error[ERROR_BUFFER_SIZE] = {0, 0, 0, 0, 0, 0};
+    uint8_t sensor_buffer[DATA_BUFFER_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-
-//    uint8_t *i2c_buffer = NULL;
-//    i2c_buffer = k_heap_alloc(&heap1, 1024, K_NO_WAIT);
-//    printk("heap1 addr: %p\n", i2c_buffer);
-
-    uint8_t i2c_buffer[1024] = {};
+    uint64_t device_cycle = 0;
 
     while (1) {
+        device_cycle++;
+        printk("[> ---- (%ums) cycle #%09llu -------------------------------- <]\n", SLEEP_TIME_MS, device_cycle);
 
-        i2c_read(i2c_dev, i2c_buffer, 1, 0x02);
-        printk("buffer[i2c]: %s\n", i2c_buffer);
+        if(i2c_ok) {
+            /* Read STATUS Register */
+            sensor_error[0] = read_sensor_register(i2c_dev, MPL3115A2_8BIT_READ, &sensor_buffer[0]);
 
+            if( ! sensor_error[0]) {
+                printk("[i2c] sensor status: %02x\n", sensor_buffer[0]);
+
+                if((sensor_buffer[0] & 0x08) > 0 ) {
+                    printk("[i2c] data ready, reading sensors ... (%ums)\n", SLEEP_TIME_MS);
+
+                    reset_sensor_errors(sensor_error, ERROR_BUFFER_SIZE);
+
+                    sensor_error[1] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_PRESSURE_MSB, &sensor_buffer[1]);
+                    sensor_error[2] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_PRESSURE_CSB, &sensor_buffer[2]);
+                    sensor_error[3] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_PRESSURE_LSB, &sensor_buffer[3]);
+                    sensor_error[4] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_TEMP_MSB, &sensor_buffer[4]);
+                    sensor_error[5] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_TEMP_LSB, &sensor_buffer[5]);
+
+                    uint32_t error_sum = sum_sensor_errors(sensor_error, ERROR_BUFFER_SIZE);
+
+                    if(error_sum != 0) {
+                        printk("[i2c] error reading from sensors ( %d %d %d %d %d %d )\n",
+                               sensor_error[0], sensor_error[1], sensor_error[2],
+                               sensor_error[3], sensor_error[4], sensor_error[5]);
+                    } else {
+                        printk("[i2c] pressure: ( %03u %03u %03u ) temperature: ( %03u, %03u )\n",
+                               sensor_buffer[1], sensor_buffer[2], sensor_buffer[3],
+                               sensor_buffer[4], sensor_buffer[5]);
+                    }
+                }
+            }
+        }
+
+        if(spi_ok) {
+            // @todo: implement display via spi.
+        }
+
+        // @todo: show device status using rgb led.
         if (led0_ok) {
 //            ret = gpio_pin_set_dt(&led0, 0);
-            ret = gpio_pin_toggle_dt(&led0);
-            if (ret < 0) {
+            opcode = gpio_pin_toggle_dt(&led0);
+            if (opcode < 0) {
                 return 0;
             }
         }
 //
         if (led1_ok) {
-            ret = gpio_pin_set_dt(&led1, 0);
+            opcode = gpio_pin_set_dt(&led1, 0);
 //            ret = gpio_pin_toggle_dt(&led1);
-            if (ret < 0) {
+            if (opcode < 0) {
                 return 0;
             }
         }
 
         if (led2_ok) {
-            ret = gpio_pin_set_dt(&led2, 0);
+            opcode = gpio_pin_set_dt(&led2, 0);
 //            ret = gpio_pin_toggle_dt(&led2);
-            if (ret < 0) {
+            if (opcode < 0) {
                 return 0;
             }
         }
