@@ -86,7 +86,7 @@ int main(void)
             if( ! sensor_error[0]) {
                 printk("[i2c] sensor status: %02x\n", sensor_buffer[0]);
 
-                if(sensor_buffer[0] & MPL3115A2_DATA_RDY) {
+                if(sensor_buffer[0] & MPL3115A2_STATUS_DATA_RDY_BITMASK) {
                     printk("[i2c] data ready, reading sensors ... (%ums)\n", SLEEP_TIME_MS);
 
                     reset_sensor_errors(sensor_error, ERROR_BUFFER_SIZE);

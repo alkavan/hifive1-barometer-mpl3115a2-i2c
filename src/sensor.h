@@ -7,7 +7,10 @@
 #define MPL3115A2_ADDRESS    (0x60)
 #define MPL3115A2_8BIT_WRITE (0xC0)
 #define MPL3115A2_8BIT_READ  (0xC1)
-#define MPL3115A2_DATA_RDY   (0x08)
+
+#define MPL3115A2_STATUS_REG (0x00)
+#define MPL3115A2_STATUS_REG_DATA_RDY_SHIFT (3)
+#define MPL3115A2_STATUS_DATA_RDY_BITMASK   (1 << MPL3115A2_STATUS_REG_DATA_RDY_SHIFT)
 
 /**
  *  0x00 Sensor Status Register         (STATUS)(1)(2)          0x00 Yes R   0x01      Alias for DR_STATUS or F_STATUS.
