@@ -49,7 +49,7 @@ bool setup_mpl3115a2_device(const struct device *i2c_dev) {
 }
 
 int read_sensor_register(const struct device *i2c_dev, const uint8_t reg_addr, uint8_t * value) {
-    int ret = i2c_reg_read_byte(i2c_dev, MPL3115A2_8BIT_READ, reg_addr, value);
+    int ret = i2c_reg_read_byte(i2c_dev, MPL3115A2_8BIT_WRITE, reg_addr, value);
 
     if (ret) {
         printk("[i2c] failed reading register: %x\n", reg_addr);

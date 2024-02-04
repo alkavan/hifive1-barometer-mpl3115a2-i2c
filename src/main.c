@@ -81,7 +81,7 @@ int main(void)
 
         if(i2c_ok) {
             /* Read STATUS Register */
-            sensor_error[0] = read_sensor_register(i2c_dev, MPL3115A2_8BIT_READ, &sensor_buffer[0]);
+            sensor_error[0] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_STATUS, &sensor_buffer[0]);
 
             if( ! sensor_error[0]) {
                 printk("[i2c] sensor status: %02x\n", sensor_buffer[0]);
