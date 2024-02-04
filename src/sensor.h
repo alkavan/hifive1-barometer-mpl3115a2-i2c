@@ -158,24 +158,50 @@ uint32_t sensor_get_config();
  * @param i2c_cfg
  * @return true if device was configured and ready to use
  */
-bool activate_mpl3115a2_device(const struct device *i2c_dev, uint32_t i2c_cfg);
+bool activate_mpl3115a2_device(const struct device * i2c_dev, uint32_t i2c_cfg);
 
 /**
- * Do sensor activation procedure.
+ * @brief Do sensor activation procedure.
+ *
  * @param i2c_dev
  * @return
  */
-bool setup_mpl3115a2_device(const struct device *i2c_dev);
+bool setup_mpl3115a2_device(const struct device * i2c_dev);
 
 /**
- * Read value from the sensor.
+ * @brief Do sensor read cycle procedure
+ *
+ * @param i2c_dev
+ * @param sensor_error
+ * @param sensor_buffer
+ * @param sleep_ms
+ * @return
+ */
+bool do_mpl3115a2_cycle(const struct device * i2c_dev,
+        int32_t * sensor_error,
+        uint8_t * sensor_buffer,
+        uint32_t sleep_ms
+        );
+
+/**
+ * @brief Read value from the sensor register.
  *
  * @param i2c_dev
  * @param reg_addr
  * @param value
  * @return
  */
-int read_sensor_register(const struct device *i2c_dev, uint8_t reg_addr, uint8_t * value);
+int sensor_read_8bit(const struct device * i2c_dev, uint8_t reg_addr, uint8_t * value);
+
+/**
+ * @brief Write data to sensor register.
+ *
+ * @param i2c_dev
+ * @param reg_addr
+ * @param value
+ * @return
+ */
+int sensor_write_8bit(const struct device * i2c_dev, uint8_t reg_addr, uint8_t value);
 
 /**
  * @brief Reset the sensor error array.
@@ -183,15 +209,15 @@ int read_sensor_register(const struct device *i2c_dev, uint8_t reg_addr, uint8_t
  * @param sensor_error
  * @param size
  */
-void reset_sensor_errors(int32_t * sensor_error, size_t size);
+void sensor_reset_errors(int32_t * sensor_error, size_t size);
 
 /**
- * Sum all opcodes in the error array.
+ * @brief Sum all opcodes in the error array.
  *
  * @param sensor_error
  * @param size
  * @return
  */
-uint32_t sum_sensor_errors(const int32_t * sensor_error, size_t size);
+uint32_t sensor_sum_errors(const int32_t * sensor_error, size_t size);
 
 #endif //HIFIVE1_BAROMETER_MPL3115A2_I2C_SENSOR_H

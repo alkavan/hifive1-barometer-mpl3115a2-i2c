@@ -7,11 +7,9 @@
 #include "leds.h"
 #include "sensor.h"
 #include "display.h"
+#include "config.h"
 
 LOG_MODULE_REGISTER(logger, CONFIG_LOG_DEFAULT_LEVEL);
-
-/* 1000 msec = 1 sec */
-#define SLEEP_TIME_MS (1000)
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
@@ -33,15 +31,12 @@ static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
 static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED2_NODE, gpios);
 
-#define ERROR_BUFFER_SIZE 6
-#define DATA_BUFFER_SIZE 8
-
 int main(void)
 {
     /**
      * I2C config
      */
-     const struct device *i2c_dev = DEVICE_DT_GET(I2C_NODE);
+     const struct device * i2c_dev = DEVICE_DT_GET(I2C_NODE);
      const uint32_t i2c_cfg = sensor_get_config();
 
     /**
@@ -77,39 +72,10 @@ int main(void)
 
     while (1) {
         device_cycle++;
-        printk("[> ---- (%ums) cycle #%09llu -------------------------------- <]\n", SLEEP_TIME_MS, device_cycle);
+        printk("[> ---- cycle #%09llu -------------------------------- <]\n", device_cycle);
 
         if(i2c_ok) {
-            /* Read STATUS Register */
-            sensor_error[0] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_STATUS, &sensor_buffer[0]);
-
-            if( ! sensor_error[0]) {
-                printk("[i2c] sensor status: %02x\n", sensor_buffer[0]);
-
-                if(sensor_buffer[0] & MPL3115A2_STATUS_DATA_RDY_BITMASK) {
-                    printk("[i2c] data ready, reading sensors ... (%ums)\n", SLEEP_TIME_MS);
-
-                    reset_sensor_errors(sensor_error, ERROR_BUFFER_SIZE);
-
-                    sensor_error[1] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_PRESSURE_MSB, &sensor_buffer[1]);
-                    sensor_error[2] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_PRESSURE_CSB, &sensor_buffer[2]);
-                    sensor_error[3] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_PRESSURE_LSB, &sensor_buffer[3]);
-                    sensor_error[4] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_TEMP_MSB, &sensor_buffer[4]);
-                    sensor_error[5] = read_sensor_register(i2c_dev, MPL3115A2_REGISTER_TEMP_LSB, &sensor_buffer[5]);
-
-                    uint32_t error_sum = sum_sensor_errors(sensor_error, ERROR_BUFFER_SIZE);
-
-                    if(error_sum != 0) {
-                        printk("[i2c] error reading from sensors ( %d %d %d %d %d %d )\n",
-                               sensor_error[0], sensor_error[1], sensor_error[2],
-                               sensor_error[3], sensor_error[4], sensor_error[5]);
-                    } else {
-                        printk("[i2c] pressure: ( %03u %03u %03u ) temperature: ( %03u, %03u )\n",
-                               sensor_buffer[1], sensor_buffer[2], sensor_buffer[3],
-                               sensor_buffer[4], sensor_buffer[5]);
-                    }
-                }
-            }
+            do_mpl3115a2_cycle(i2c_dev, sensor_error, sensor_buffer, SLEEP_TIME_MS);
         }
 
         if(spi_ok) {
