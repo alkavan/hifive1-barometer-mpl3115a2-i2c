@@ -72,7 +72,9 @@ int main(void)
 
     while (1) {
         device_cycle++;
-        printk("[> ---- cycle #%09llu -------------------------------- <]\n", device_cycle);
+        if(device_cycle % 10 == 0) {
+            printk("[> ---- cycle #%09llu -------------------------------- <]\n", device_cycle);
+        }
 
         if(i2c_ok) {
             do_mpl3115a2_cycle(i2c_dev, sensor_error, sensor_buffer, SLEEP_TIME_MS);
