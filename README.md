@@ -20,3 +20,10 @@
 ## Resources
 - [Adafruit MPL3115A2 Library](https://github.com/adafruit/Adafruit_MPL3115A2_Library)
 - [PlatformIO - Unit Testing](https://docs.platformio.org/en/latest/advanced/unit-testing/index.html)
+
+## To Do
+
+* Implement ***polling*** sensor read.
+* Implement ***interrupt*** sensor read.
+* Implement ***altimeter*** mode.
+* Implement ***barometer*** mode.

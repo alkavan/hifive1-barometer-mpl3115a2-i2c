@@ -105,12 +105,12 @@ enum {
  * @brief MPL3115A2 sensor control register bits.
  */
 enum {
+    MPL3115A2_CTRL_REG1_BAR  = 0x00,
     MPL3115A2_CTRL_REG1_SBYB = 0x01,
     MPL3115A2_CTRL_REG1_OST  = 0x02,
     MPL3115A2_CTRL_REG1_RST  = 0x04,
     MPL3115A2_CTRL_REG1_RAW  = 0x40,
     MPL3115A2_CTRL_REG1_ALT  = 0x80,
-    MPL3115A2_CTRL_REG1_BAR  = 0x00,
 };
 
 /**
@@ -177,7 +177,8 @@ bool setup_mpl3115a2_device(const struct device * i2c_dev);
  * @param sleep_ms
  * @return
  */
-bool do_mpl3115a2_cycle(const struct device * i2c_dev,
+bool do_mpl3115a2_cycle(
+        const struct device * i2c_dev,
         int32_t * sensor_error,
         uint8_t * sensor_buffer,
         uint32_t sleep_ms
